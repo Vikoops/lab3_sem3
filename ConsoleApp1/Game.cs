@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -264,7 +264,7 @@ namespace ConsoleBattleCity
 
         internal void MoveEnemies()
         {
-            List<Enemy> currentEnemies = enemies.ToList(); // Копируем список врагов для безопасного изменения
+            List<Enemy> currentEnemies = enemies.ToList(); // Копируем список врагов для изменения
             foreach (var enemy in currentEnemies)
             {
                 // Определяем случайное направление движения
@@ -332,20 +332,58 @@ namespace ConsoleBattleCity
 
         internal void LoadGameState()
         {
-            string json = File.ReadAllText("game_state.json");
-            GameState gameState = JsonSerializer.Deserialize<GameState>(json);
-
-            if (gameState != null)
+            try
             {
-                playerX = gameState.PlayerX;
-                playerY = gameState.PlayerY;
-                enemies = gameState.Enemies; // Загрузка врагов
-                obstacles = gameState.Obstacles; // Загрузка препятствий
+                if (File.Exists("game_state.json"))
+                {
+                    string json = File.ReadAllText("game_state.json");
+                    GameState gameState = JsonSerializer.Deserialize<GameState>(json);
 
-                InitializeMap(); // Инициализация карты с новыми позициями
+                    if (gameState != null)
+                    {
+                        playerX = gameState.PlayerX;
+                        playerY = gameState.PlayerY;
+                        enemies = gameState.Enemies; // Загрузка врагов
+                        obstacles = gameState.Obstacles; // Загрузка препятствий
+
+                        InitializeMap(); // Инициализация карты с новыми позициями
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("Нет сохраненного состояния игры!");
+                    Thread.Sleep(2000);
+                    ShowMenu(); // Возвращаемся в меню
+                }
+            }
+            catch (FileNotFoundException ex)
+            {
+                Console.WriteLine("Файл состояния игры не найден.");
+                Console.WriteLine(ex.Message);
+                Thread.Sleep(2000);
+                ShowMenu(); // Возвращаемся в меню
+            }
+            catch (JsonException ex)
+            {
+                Console.WriteLine("Ошибка загрузки состояния игры: некорректные данные.");
+                Console.WriteLine(ex.Message);
+                Thread.Sleep(2000);
+                ShowMenu(); // Возвращаемся в меню
+            }
+            catch (IOException ex)
+            {
+                Console.WriteLine("Ошибка ввода-вывода при загрузке состояния игры.");
+                Console.WriteLine(ex.Message);
+                Thread.Sleep(2000);
+                ShowMenu(); // Возвращаемся в меню
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Произошла непредвиденная ошибка при загрузке состояния игры.");
+                Console.WriteLine(ex.Message);
+                Thread.Sleep(2000);
+                ShowMenu(); // Возвращаемся в меню
             }
         }
     }
 }
-
-
