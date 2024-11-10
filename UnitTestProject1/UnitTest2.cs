@@ -1,4 +1,4 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Collections.Generic;
 using ConsoleBattleCity;
 using System;
@@ -55,18 +55,28 @@ namespace UnitTestProject1
             Assert.AreEqual(4, game.enemies.Count);
         }
 
+
         [TestMethod]
         public void TestMoveEnemies()
         {
             game.InitializeMap();
             game.SpawnEnemies(1);
+
+            // Сохраняем начальную позицию врага
             var initialEnemyPosition = (game.enemies[0].X, game.enemies[0].Y);
 
+            // Заглушаем случайный генератор, чтобы выбор направления был предсказуемым
+            game.random = new Random(42); // Используем фиксированное seed
+
+            // Перемещаем врагов
             game.MoveEnemies();
 
             // Проверяем, что враг переместился с исходной позиции
-            Assert.AreNotEqual(initialEnemyPosition, (game.enemies[0].X, game.enemies[0].Y));
+            var newEnemyPosition = (game.enemies[0].X, game.enemies[0].Y);
+            Assert.AreNotEqual(initialEnemyPosition, newEnemyPosition, "Враг не переместился.");
         }
+
+
 
         [TestMethod]
         public void TestCheckCollisionWithEnemies_NoCollision()
