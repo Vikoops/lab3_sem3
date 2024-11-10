@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
-using System.Text.Json;
 
 namespace ConsoleBattleCity
 {
@@ -29,8 +28,6 @@ namespace ConsoleBattleCity
             Console.WriteLine("2. Загрузить игру");
             Console.WriteLine("3. Выход");
             Console.WriteLine("Выберите опцию: ");
-            
-            
 
             var choice = Console.ReadKey(true).Key;
 
@@ -40,7 +37,7 @@ namespace ConsoleBattleCity
                     InitializeNewGame();
                     break;
                 case ConsoleKey.D2: // Загрузить игру
-                    if (File.Exists("game_state.json"))
+                    if (File.Exists("game_state.txt"))
                     {
                         LoadGameState(); // Загрузка состояния игры из файла
                         StartGame();
@@ -292,68 +289,107 @@ namespace ConsoleBattleCity
                         break;
                 }
 
-                // Проверка на возможность движения врага
+                // Проверка на допустимость движения
                 if (IsValidMove(newEnemyX, newEnemyY))
                 {
-                    // Обновляем позицию врага
-                    map[enemyY, enemyX] = '.'; // Стираем старую позицию врага
                     enemy.X = newEnemyX;
                     enemy.Y = newEnemyY;
-                    map[newEnemyY, newEnemyX] = 'E'; // Рисуем нового врага
                 }
             }
         }
 
         internal bool IsValidMove(int x, int y)
         {
-            // Проверка на границы карты и препятствия
-            return x > 0 && x < map.GetLength(1) - 1 && y > 0 && y < map.GetLength(0) - 1 &&
-                   !obstacles.Any(o => o.X == x && o.Y == y); // Проверка на столкновение с препятствием
+            if (x < 1 || x >= map.GetLength(1) - 1 || y < 1 || y >= map.GetLength(0) - 1) // За пределами карты
+                return false;
+
+            if (map[y, x] == '|' || map[y, x] == '-' || map[y, x] == 'E') // Столкновение с препятствиями или врагами
+                return false;
+
+            return true;
         }
 
         internal bool CheckCollisionWithEnemies()
         {
-            return enemies.Any(e => e.X == playerX && e.Y == playerY); // Проверка столкновения с врагами
+            return enemies.Any(e => e.X == playerX && e.Y == playerY); // Если игрок на позиции врага
         }
 
         internal void SaveGameState()
         {
-            GameState gameState = new GameState
+            try
             {
-                PlayerX = playerX,
-                PlayerY = playerY,
-                Enemies = enemies.Select(e => new Enemy { X = e.X, Y = e.Y }).ToList(), // Сериализация врагов
-                Obstacles = obstacles // Сериализация препятствий
-            };
+                List<string> gameStateLines = new List<string>
+                {
+                    playerX.ToString(),
+                    playerY.ToString(),
+                    enemies.Count.ToString()
+                };
 
-            string json = JsonSerializer.Serialize(gameState);
-            File.WriteAllText("game_state.json", json); // Сохранение состояния игры в файл
+                foreach (var enemy in enemies)
+                {
+                    gameStateLines.Add($"{enemy.X},{enemy.Y}");
+                }
+
+                gameStateLines.Add(obstacles.Count.ToString());
+                foreach (var obstacle in obstacles)
+                {
+                    gameStateLines.Add($"{obstacle.X},{obstacle.Y}");
+                }
+
+                File.WriteAllLines("game_state.txt", gameStateLines);
+            }
+            catch (IOException ex)
+            {
+                Console.WriteLine("Ошибка при сохранении состояния игры: " + ex.Message);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                Console.WriteLine("Нет доступа к файлу для сохранения: " + ex.Message);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Произошла непредвиденная ошибка при сохранении: " + ex.Message);
+            }
         }
 
         internal void LoadGameState()
         {
             try
             {
-                if (File.Exists("game_state.json"))
+                if (File.Exists("game_state.txt"))
                 {
-                    string json = File.ReadAllText("game_state.json");
-                    GameState gameState = JsonSerializer.Deserialize<GameState>(json);
+                    string[] gameStateLines = File.ReadAllLines("game_state.txt");
 
-                    if (gameState != null)
+                    playerX = int.Parse(gameStateLines[0]);
+                    playerY = int.Parse(gameStateLines[1]);
+
+                    int enemyCount = int.Parse(gameStateLines[2]);
+                    enemies.Clear();
+                    for (int i = 0; i < enemyCount; i++)
                     {
-                        playerX = gameState.PlayerX;
-                        playerY = gameState.PlayerY;
-                        enemies = gameState.Enemies; // Загрузка врагов
-                        obstacles = gameState.Obstacles; // Загрузка препятствий
-
-                        InitializeMap(); // Инициализация карты с новыми позициями
+                        string[] enemyCoords = gameStateLines[3 + i].Split(',');
+                        int enemyX = int.Parse(enemyCoords[0]);
+                        int enemyY = int.Parse(enemyCoords[1]);
+                        enemies.Add(new Enemy { X = enemyX, Y = enemyY });
                     }
+
+                    int obstacleCount = int.Parse(gameStateLines[3 + enemyCount]);
+                    obstacles.Clear();
+                    for (int i = 0; i < obstacleCount; i++)
+                    {
+                        string[] obstacleCoords = gameStateLines[4 + enemyCount + i].Split(',');
+                        int obstacleX = int.Parse(obstacleCoords[0]);
+                        int obstacleY = int.Parse(obstacleCoords[1]);
+                        obstacles.Add(new Obstacle { X = obstacleX, Y = obstacleY });
+                    }
+
+                    InitializeMap();
                 }
                 else
                 {
                     Console.WriteLine("Нет сохраненного состояния игры!");
                     Thread.Sleep(2000);
-                    ShowMenu(); // Возвращаемся в меню
+                    ShowMenu();
                 }
             }
             catch (FileNotFoundException ex)
@@ -361,29 +397,23 @@ namespace ConsoleBattleCity
                 Console.WriteLine("Файл состояния игры не найден.");
                 Console.WriteLine(ex.Message);
                 Thread.Sleep(2000);
-                ShowMenu(); // Возвращаемся в меню
-            }
-            catch (JsonException ex)
-            {
-                Console.WriteLine("Ошибка загрузки состояния игры: некорректные данные.");
-                Console.WriteLine(ex.Message);
-                Thread.Sleep(2000);
-                ShowMenu(); // Возвращаемся в меню
+                ShowMenu();
             }
             catch (IOException ex)
             {
                 Console.WriteLine("Ошибка ввода-вывода при загрузке состояния игры.");
                 Console.WriteLine(ex.Message);
                 Thread.Sleep(2000);
-                ShowMenu(); // Возвращаемся в меню
+                ShowMenu();
             }
             catch (Exception ex)
             {
                 Console.WriteLine("Произошла непредвиденная ошибка при загрузке состояния игры.");
                 Console.WriteLine(ex.Message);
                 Thread.Sleep(2000);
-                ShowMenu(); // Возвращаемся в меню
+                ShowMenu();
             }
         }
     }
+
 }
